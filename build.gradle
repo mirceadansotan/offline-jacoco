@@ -1,0 +1,124 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+//apply from: 'jacoco.gradle'
+configurations {
+    jacoco
+    jacocoRuntime
+}
+buildscript {
+    ext.kotlin_version = "1.4.21"
+    ext.outputDir = buildDir.path + '/classes-instrumented'
+    repositories {
+        google()
+        jcenter()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:4.2.0-beta04"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jacoco:org.jacoco.core:0.8.6"
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+
+apply from: "jacoco.gradle"
+
+apply plugin: 'jacoco'
+
+task jacocoFullReport(type: JacocoReport, group: 'Coverage reports') {
+    def projects = subprojects
+
+    // Here we depend on the jacocoReport task that we created before
+    dependsOn(projects.jacocoReport)
+
+    final source = files(projects.jacocoReport.sourceDirectories)
+
+    additionalSourceDirs.setFrom source
+    sourceDirectories.setFrom source
+
+    classDirectories.setFrom files(projects.jacocoReport.classDirectories)
+    executionData.setFrom files(projects.jacocoReport.executionData)
+
+    reports {
+        html {
+            enabled true
+            destination file('build/reports/jacoco/html')
+        }
+        csv {
+            enabled true
+            destination file('build/reports/jacoco/jacocoFullReport.csv')
+        }
+    }
+
+    doFirst {
+        //noinspection GroovyAssignabilityCheck
+        executionData.setFrom files(executionData.findAll { it.exists() })
+    }
+}
+
+dependencies {
+    jacoco group: 'org.jacoco', name: 'org.jacoco.ant', version: '0.8.6', classifier: 'nodeps'
+    jacocoRuntime group: 'org.jacoco', name: 'org.jacoco.agent', version: '0.8.6', classifier: 'runtime'
+}
+
+jacoco {
+    toolVersion = "0.8.6"
+}
+
+
+task instrument(dependsOn: ['app:compileDebugSources',
+                            'mylibrary:compileDebugSources']) {
+
+    doLast {
+        ant.taskdef(name: 'instrument', classname: 'org.jacoco.ant.InstrumentTask', classpath: configurations.jacoco.asPath)
+        ant.instrument(destdir: outputDir) {
+            subprojects.each {
+                fileset(dir: "${it.buildDir}/tmp/kotlin-classes/debug/")
+            }
+        }
+    }
+}
+
+task report {
+    doLast {
+        ant.taskdef(name: 'report', classname: 'org.jacoco.ant.ReportTask', classpath: configurations.jacoco.asPath)
+        ant.report() {
+            executiondata {
+                subprojects.each { subproject ->
+                    ant.file(file: subproject.buildDir.path + '/jacoco/testDebugUnitTest.exec')
+                    ant.file(file: subproject.buildDir.path + '/jacoco/coverage.ec')
+                }
+            }
+            structure(name: 'Example') {
+                classfiles {
+                    subprojects.each { subproject -> fileset(dir: "${subproject.buildDir}/tmp/kotlin-classes/debug") }
+                }
+                sourcefiles {
+                    subprojects.each { subproject -> fileset(dir: "${subproject.projectDir}/src/main/java") }
+                }
+            }
+            html(destdir: buildDir.path + '/reports-off/jacoco')
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+

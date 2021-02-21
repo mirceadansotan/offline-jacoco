@@ -1,0 +1,52 @@
+def coveredProject = subprojects
+
+configure(coveredProject) { subproject ->
+    configurations {
+        jacoco
+        jacocoRuntime
+    }
+
+    apply plugin: 'jacoco'
+
+    dependencies {
+        jacoco group: 'org.jacoco', name: 'org.jacoco.ant', version: '0.8.6', classifier: 'nodeps'
+        jacocoRuntime group: 'org.jacoco', name: 'org.jacoco.agent', version: '0.8.6', classifier: 'runtime'
+    }
+
+    jacoco {
+        toolVersion = "0.8.6"
+    }
+
+    tasks.withType(Test) {
+        jacoco.includeNoLocationClasses = true
+    }
+
+    task jacocoReport(type: JacocoReport, dependsOn: ['testDebugUnitTest']) {
+        reports {
+            xml.enabled = true
+            html.enabled = true
+        }
+
+        def fileFilter = ['**/R.class',
+                          '**/R$*.class',
+                          '**/BuildConfig.*',
+                          '**/Manifest*.*',
+                          '**/*Test*.*',
+                          'android/**/*.*',
+                          '**/data/models/*']
+        def debugTree = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: fileFilter)
+        def mainSrc = "${project.projectDir}/src/main/java"
+
+        sourceDirectories.from(files([mainSrc]))
+        classDirectories.from(files([debugTree]))
+        executionData.from(fileTree(dir: "$buildDir", includes: [
+                "jacoco/testDebugUnitTest.exec",
+                "outputs/code-coverage/connected/*coverage.ec"
+        ]))
+
+        doLast() {
+            print "file://${reports.html.destination}/index.html"
+        }
+    }
+}
+

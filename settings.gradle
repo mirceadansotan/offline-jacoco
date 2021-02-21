@@ -1,0 +1,9 @@
+rootProject.name = "My Application"
+include ':app'
+
+buildCache {
+    local {
+        enabled = false
+    }
+}
+include ':mylibrary'
